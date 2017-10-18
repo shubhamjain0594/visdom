@@ -23,6 +23,7 @@ import numbers
 from six import string_types
 from six import BytesIO
 import logging
+from numbers import Number
 
 try:
     import torchfile
@@ -152,6 +153,32 @@ def _markerColorCheck(mc, X, Y, L):
     return ret
 
 
+def _markerSizeCheck(ms, X, Y, L):
+    if isinstance(ms, Number):
+        assert ms > 0, "marker size should be greater than 0."
+        return ms
+    assert isndarray(ms), 'ms should be a numpy ndarray'
+    assert ms.shape[0] == L or (ms.shape[0] == X.shape[0]) and ms.ndim == 1, \
+        'marker sizes have to be a Number or an array of size `%d` ' + \
+        ' or `%d`, but got: %s' % (X.shape[0], L, 'x'.join(ms.shape))
+
+    assert (ms >= 0).all(), 'marker sizes have to be >= 0'
+    assert (ms == np.floor(ms)).all(), 'marker sizes are assumed to be ints'
+
+    ms = np.uint(ms)
+
+    if ms.shape[0] != X.shape[0]:
+        markersize = [ms[Y[i] - 1] for i in range(Y.shape[0])]
+    else:
+        markersize = [ms[i] for i in range(Y.shape[0])]
+
+    ret = {}
+    for k, v in enumerate(markersize):
+        ret[Y[k]] = ret.get(Y[k], []) + [v]
+
+    return ret
+
+
 def _assert_opts(opts):
     if opts.get('color'):
         assert isstr(opts.get('color')), 'color should be a string'
@@ -166,11 +193,6 @@ def _assert_opts(opts):
     if opts.get('markersymbol'):
         assert isstr(opts.get('markersymbol')), \
             'marker symbol should be string'
-
-    if opts.get('markersize'):
-        assert isnum(opts.get('markersize')) \
-            and opts.get('markersize') > 0, \
-            'marker size should be a positive number'
 
     if opts.get('columnnames'):
         assert isinstance(opts.get('columnnames'), list), \
@@ -544,10 +566,14 @@ class Visdom(object):
             assert len(name) >= 0, 'name of trace should be nonempty string'
             assert X.ndim == 1, 'updating by name expects 1-dim data'
 
-        if opts is not None and opts.get('markercolor') is not None:
+        if opts is not None:
             K = int(Y.max())
-            opts['markercolor'] = _markerColorCheck(
-                opts['markercolor'], X, Y, K)
+            if opts.get('markercolor') is not None:
+                opts['markercolor'] = _markerColorCheck(
+                    opts['markercolor'], X, Y, K)
+            if opts.get('markersize') is not None:
+                opts['markersize'] = _markerSizeCheck(
+                    opts['markersize'], X, Y, K)
 
         data = {'x': X.transpose().tolist(), 'y': Y.transpose().tolist()}
         if X.ndim == 1:
@@ -608,6 +634,8 @@ class Visdom(object):
         opts['mode'] = opts.get('mode', 'markers')
         opts['markersymbol'] = opts.get('markersymbol', 'dot')
         opts['markersize'] = opts.get('markersize', 10)
+        opts['markersize'] = _markerSizeCheck(
+            opts['markersize'], X, Y, K)
 
         if opts.get('markercolor') is not None:
             opts['markercolor'] = _markerColorCheck(
@@ -623,6 +651,7 @@ class Visdom(object):
             ind = np.equal(Y, k)
             if ind.any():
                 mc = opts.get('markercolor')
+                ms = opts.get('markersize')
                 _data = {
                     'x': nan2none(X.take(0, 1)[ind].tolist()),
                     'y': nan2none(X.take(1, 1)[ind].tolist()),
@@ -631,7 +660,7 @@ class Visdom(object):
                     'type': 'scatter3d' if is3d else 'scatter',
                     'mode': opts.get('mode'),
                     'marker': {
-                        'size': opts.get('markersize'),
+                        'size': ms if isnum(ms) else ms[k],
                         'symbol': opts.get('markersymbol'),
                         'color': mc[k] if mc is not None else None,
                         'line': {
