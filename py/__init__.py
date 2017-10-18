@@ -23,7 +23,6 @@ import numbers
 from six import string_types
 from six import BytesIO
 import logging
-from numbers import Number
 
 try:
     import torchfile
@@ -154,10 +153,10 @@ def _markerColorCheck(mc, X, Y, L):
 
 
 def _markerSizeCheck(ms, X, Y, L):
-    if isinstance(ms, Number):
+    if isnum(ms):
         assert ms > 0, "marker size should be greater than 0."
         return ms
-    assert isndarray(ms), 'ms should be a numpy ndarray'
+    assert isndarray(ms), 'ms should be a numpy ndarray or a number.'
     assert ms.shape[0] == L or (ms.shape[0] == X.shape[0]) and ms.ndim == 1, \
         'marker sizes have to be a Number or an array of size `%d` ' + \
         ' or `%d`, but got: %s' % (X.shape[0], L, 'x'.join(ms.shape))
@@ -274,6 +273,11 @@ class Visdom(object):
         """
         if msg.get('eid', None) is None:
             msg['eid'] = self.env
+        for key, val in msg.items():
+            print(key, val)
+            if isinstance(val, dict):
+                for inkey, inval in val.items():
+                    print(inkey, inval)
 
         if not self.send:
             return msg, endpoint
@@ -682,7 +686,7 @@ class Visdom(object):
             'win': win,
             'eid': env,
             'layout': _opts2layout(opts, is3d),
-            'opts': opts,
+            'opts': {},
         })
 
     def line(self, Y, X=None, win=None, env=None, opts=None, update=None):
