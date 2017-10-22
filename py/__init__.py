@@ -167,9 +167,9 @@ def _markerSizeCheck(ms, X, Y, L):
     ms = np.uint(ms)
 
     if ms.shape[0] != X.shape[0]:
-        markersize = [ms[Y[i] - 1] for i in range(Y.shape[0])]
+        markersize = [str(ms[Y[i] - 1]) for i in range(Y.shape[0])]
     else:
-        markersize = [ms[i] for i in range(Y.shape[0])]
+        markersize = [str(ms[i]) for i in range(Y.shape[0])]
 
     ret = {}
     for k, v in enumerate(markersize):
